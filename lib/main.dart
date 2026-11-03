@@ -5,11 +5,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'ffi.dart';
 import 'download_manager.dart';
 import 'download_manager_ios.dart';
-import 'ios_bookmark.dart';
 
 BaseDownloadManager get downloadManager =>
     Platform.isIOS ? DownloadManagerIOS.instance : DownloadManager.instance;
@@ -26,6 +26,11 @@ String _formatBytes(int bytes) {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   setTempDir(Directory.systemTemp.path);
+  if (Platform.isIOS) {
+    final documents = await getApplicationDocumentsDirectory();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('download_directory', documents.path);
+  }
   await downloadManager.init();
   runApp(const MainApp());
 }
@@ -664,8 +669,12 @@ class _SettingsTabState extends State<SettingsTab> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+
+    final downloadDir = prefs.getString(_prefKey);
+
+    if (!mounted) return;
     setState(() {
-      _downloadDir = prefs.getString(_prefKey);
+      _downloadDir = downloadDir;
       _decrypt = prefs.getBool(_decryptKey) ?? true;
       _keepScreenOn = prefs.getBool(_keepScreenOnKey) ?? false;
       _loading = false;
@@ -719,11 +728,6 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   Future<void> _pickDirectory() async {
-    if (Platform.isIOS) {
-      await _pickDirectoryIOS();
-      return;
-    }
-
     final hasPermission = await _ensureStoragePermission();
     if (!hasPermission) return;
 
@@ -735,15 +739,6 @@ class _SettingsTabState extends State<SettingsTab> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKey, result);
     setState(() => _downloadDir = result);
-  }
-
-  Future<void> _pickDirectoryIOS() async {
-    final path = await IOSBookmark.pickAndBookmarkFolder();
-    if (path == null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKey, path);
-    setState(() => _downloadDir = path);
   }
 
   @override
@@ -758,8 +753,8 @@ class _SettingsTabState extends State<SettingsTab> {
                   leading: const Icon(Icons.folder),
                   title: const Text('Download Directory'),
                   subtitle: Text(_downloadDir ?? 'Not set'),
-                  trailing: const Icon(Icons.edit),
-                  onTap: _pickDirectory,
+                  trailing: Platform.isIOS ? null : const Icon(Icons.edit),
+                  onTap: Platform.isIOS ? null : _pickDirectory,
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.lock_open),

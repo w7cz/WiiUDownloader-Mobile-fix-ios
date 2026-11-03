@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'ffi.dart';
 import 'download_manager_base.dart';
-import 'ios_bookmark.dart';
 
 export 'download_manager_base.dart';
 
@@ -82,9 +80,6 @@ class DownloadManagerIOS extends BaseDownloadManager {
   }
 
   Future<void> _startEntryAsync(DownloadEntry entry) async {
-    if (Platform.isIOS) {
-      await IOSBookmark.startAccessingBookmark();
-    }
     _startEntry(entry);
   }
 
@@ -142,7 +137,6 @@ class DownloadManagerIOS extends BaseDownloadManager {
           _processQueue();
         } else {
           _disableWakelock();
-          IOSBookmark.stopAccessingBookmark();
         }
       },
     );
@@ -162,7 +156,6 @@ class DownloadManagerIOS extends BaseDownloadManager {
     notifyListeners();
     if (!_hasActiveDownloads()) {
       _disableWakelock();
-      IOSBookmark.stopAccessingBookmark();
     }
   }
 
