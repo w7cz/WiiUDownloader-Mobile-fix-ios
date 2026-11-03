@@ -1,0 +1,71 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Build unsigned iOS IPA
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: native_lib/go.mod
+          cache: true
+          cache-dependency-path: native_lib/go.sum
+
+      - name: Set up Flutter
+        uses: flutter-actions/setup-flutter@v4
+        with:
+          channel: stable
+          version: 3.41.3
+
+      - name: Show tool versions
+        run: |
+          go version
+          flutter --version
+          ruby --version
+          pod --version
+          python3 --version
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build iOS app and package IPA
+        run: |
+          rm -rf Payload wiiudownloader.ipa
+          zsh build_ios.sh
+          test -d Payload/Runner.app
+          test -f wiiudownloader.ipa
+          ls -lh wiiudownloader.ipa
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: WiiUDownloader-iOS-unsigned
+          path: wiiudownloader.ipa
+          if-no-files-found: error
+          retention-days: 14
